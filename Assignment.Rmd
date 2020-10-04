@@ -1,0 +1,114 @@
+---
+title: "Project Assignment"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+
+
+## Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+## Introduction 
+
+The objective of our report is to find a good model to predict the outcome "classe" of the dataset that we have. 
+The outcome variable is a factor with 5 levels. Participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in 5 different fashions:
+
+- exactly according to the specification (Class A)
+- throwing the elbows to the front (Class B)
+- lifting the dumbbell only halfway (Class C)
+- lowering the dumbbell only halfway (Class D)
+- throwing the hips to the front (Class E)
+
+## Libraries and Data processing 
+
+This are the packages used in this report, all necessary to use the models tested here.
+
+```{r libs, message= FALSE, warning= FALSE}
+library("caret")
+library("randomForest")
+library("rpart")
+library("gbm")
+```
+
+We suppose here that you are already in your work repository, and since we already downloaded the data, we didn't actually run that code. After that we read 
+the csv files and we take out the NA values, then we take out the first seven columns since this aren't variables that can be used to predict the model. We put the variable "classe" as factor since the data doesn't treat it as a factor.
+
+```{r reading and downloading the data}
+
+#train_url    <- 'http://d396qusza40orc.cloudfront.net/predmachlearn/pml-train.csv'
+#test_url  <- 'http://d396qusza40orc.cloudfront.net/predmachlearn/pml-test.csv'
+#download.file(train_url,"train.csv")
+#download.file(test_url,"test.csv")
+
+train <- read.csv("train.csv", na.strings=c("NA","#DIV/0!", ""))
+test <- read.csv("test.csv" , na.strings=c("NA", "#DIV/0!", ""))
+train<-train[,colSums(is.na(train)) == 0]
+test <-test[,colSums(is.na(test)) == 0]
+train$classe <- as.factor(train$classe)
+
+train   <-train[,-c(1:7)]
+test <-test[,-c(1:7)]
+```
+
+After making the changes on the data we will separate the training data into two separate data.frames to test our models (cross-validation).
+
+
+```{r cross}
+set.seed(278910)
+
+crossvalidation <- createDataPartition(y=train$classe, p=0.80, list=FALSE)
+cv_train <- train[crossvalidation, ] 
+cv_test <- train[-crossvalidation, ]
+```
+
+## Prediction models 
+
+The first model that we fit into the data is a simple decision tree model, after training the model we test it in the cross-validation section for it, and we can see the results in the confusion matrix ploted below. With an accuracy below 90% we decide to test another prediction model for the data.
+
+```{r fit1}
+
+fit_dt <- rpart(classe ~ ., data=cv_train, method="class")
+
+predict_dt <- predict(fit_dt, cv_test, type = "class")
+
+confusionMatrix(predict_dt, cv_test$classe)
+```
+
+The second model tested is the random forest model, and as we can see in the confusion matrix, the results are much better than the last model. Still, we will try one more model for classification and see if we can get better results.
+
+```{r fit2}
+
+fit_rf <- randomForest(classe ~ ., data=cv_train)
+
+predict_rf <- predict(fit_rf, cv_test, type = "class")
+
+confusionMatrix(predict_rf, cv_test$classe)
+```
+
+
+The third and last model that we test is a gradient boost model. This model was better than the decision tree, but the random forest model is better.
+
+```{r fit3}
+
+fit_gbm<- train(classe~., data=cv_train, method="gbm", verbose= FALSE)
+
+predict_gbm<- predict(fit_gbm, cv_test)
+
+confusionMatrix(predict_gbm, cv_test$classe)
+```
+
+
+## Prediction
+
+Our prediction is made with the random forest model, that had the best results in our tests.
+
+```{r predict}
+
+predict(fit_rf, test, type = "class")
+```
